@@ -425,18 +425,6 @@ def nplr(measure, N, rank=1, dtype=tf.float32):
     if measure == 'random':
         dtype = tf.complex64 if dtype == tf.float32 else tf.complex128
 
-        w = -tf.exp(tf.random.normal(shape=(N // 2,))) + 1j * tf.random.normal(shape=(N // 2,))
-
-
-def nplr(measure, N, rank=1, dtype=tf.float32):
-    """ Return w, p, q, V, B such that
-    (w - p q^*, B) is unitarily equivalent to the original HiPPO A, B by the matrix V
-    i.e. A = V[w - p q^*]V^*, B = V B
-    """
-    assert dtype == tf.float32 or tf.complex64
-    if measure == 'random':
-        dtype = tf.complex64 if dtype == tf.float32 else tf.complex128
-
         w = -tf.exp(tf.random.normal(N // 2)) + 1j * tf.random.normal(N // 2)
         P = tf.random.normal((rank, N // 2), dtype=dtype)
         B = tf.random.normal(N // 2, dtype=dtype)
