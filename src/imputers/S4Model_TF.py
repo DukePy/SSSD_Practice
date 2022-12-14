@@ -416,69 +416,52 @@ def rank_correction(measure, N, rank=1, dtype=tf.float32):
     return P
 
 
-def nplr(measure, N, rank=1, dtype=torch.float):
+def nplr(measure, N, rank=1, dtype=tf.float32):
     """ Return w, p, q, V, B such that
     (w - p q^*, B) is unitarily equivalent to the original HiPPO A, B by the matrix V
     i.e. A = V[w - p q^*]V^*, B = V B
     """
-    assert dtype == torch.float or torch.cfloat
+    assert dtype == tf.float32 or tf.complex64
     if measure == 'random':
-        dtype = torch.cfloat if dtype == torch.float else torch.cdouble
-        # w = torch.randn(N//2, dtype=dtype)
-        w = -torch.exp(torch.randn(N//2)) + 1j*torch.randn(N//2)
-        P = torch.randn(rank, N//2, dtype=dtype)
-        B = torch.randn(N//2, dtype=dtype)
-        V = torch.eye(N, dtype=dtype)[..., :N//2] # Only used in testing
+        dtype = tf.complex64 if dtype == tf.float32 else tf.complex128
+
+        w = -tf.exp(tf.random.normal(shape=(N // 2,))) + 1j * tf.random.normal(shape=(N // 2,))
+
+
+def nplr(measure, N, rank=1, dtype=tf.float32):
+    """ Return w, p, q, V, B such that
+    (w - p q^*, B) is unitarily equivalent to the original HiPPO A, B by the matrix V
+    i.e. A = V[w - p q^*]V^*, B = V B
+    """
+    assert dtype == tf.float32 or tf.complex64
+    if measure == 'random':
+        dtype = tf.complex64 if dtype == tf.float32 else tf.complex128
+
+        w = -tf.exp(tf.random.normal(N // 2)) + 1j * tf.random.normal(N // 2)
+        P = tf.random.normal((rank, N // 2), dtype=dtype)
+        B = tf.random.normal(N // 2, dtype=dtype)
+        V = tf.eye(N, dtype=dtype)[..., :N // 2]  # Only used in testing
         return w, P, B, V
 
     A, B = transition(measure, N)
-    A = torch.as_tensor(A, dtype=dtype) # (N, N)
-    B = torch.as_tensor(B, dtype=dtype)[:, 0] # (N,)
+    A = tf.convert_to_tensor(A, dtype=dtype)  # (N, N)
+    B = tf.convert_to_tensor(B, dtype=dtype)[:, 0]  # (N,)
 
     P = rank_correction(measure, N, rank=rank, dtype=dtype)
-    AP = A + torch.sum(P.unsqueeze(-2)*P.unsqueeze(-1), dim=-3)
-    w, V = torch.linalg.eig(AP) # (..., N) (..., N, N)
-    # V w V^{-1} = A
+    AP = A + tf.reduce_sum(P[..., None, :, :] * P[..., None, :], axis=-3)
+    w, V = tf.linalg.eig(AP)  # (..., N) (..., N, N)
 
     # Only keep one of the conjugate pairs
-    w = w[..., 0::2].contiguous()
-    V = V[..., 0::2].contiguous()
+    w = w[..., 0::2].numpy()
+    V = V[..., 0::2].numpy()
 
-    V_inv = V.conj().transpose(-1, -2)
+    V_inv = tf.linalg.inv(V)
 
-    B = contract('ij, j -> i', V_inv, B.to(V)) # V^* B
-    P = contract('ij, ...j -> ...i', V_inv, P.to(V)) # V^* P
-
-
-    return w, P, B, V
-
-def nplr(measure, N, rank=1, dtype=torch.float):
-    assert dtype == torch.float or torch.cfloat
-    if measure == 'random':
-        dtype = torch.cfloat if dtype == torch.float else torch.cdouble
-        w = -torch.exp(torch.randn(N//2)) + 1j*torch.randn(N//2)
-        P = torch.randn(rank, N//2, dtype=dtype)
-        B = torch.randn(N//2, dtype=dtype)
-        V = torch.eye(N, dtype=dtype)[..., :N//2]
-        return w, P, B, V
-
-    A, B = transition(measure, N)
-    A = torch.as_tensor(A, dtype=dtype)
-    B = torch.as_tensor(B, dtype=dtype)[:, 0]
-
-    P = rank_correction(measure, N, rank=rank, dtype=dtype)
-    AP = A + torch.sum(P.unsqueeze(-2)*P.unsqueeze(-1), dim=-3)
-    w, V = torch.linalg.eig(AP)
-
-    w = w[..., 0::2].contiguous()
-    V = V[..., 0::2].contiguous()
-
-    V_inv = V.conj().transpose(-1, -2)
-
-    B = contract('ij, j -> i', V_inv, B.to(V))
-    P = contract('ij, ...j -> ...i', V_inv, P.to(V))
+    B = contract('ij, j -> i', V_inv, B)  # V^* B
+    P = contract('ij, ...j -> ...i', V_inv, P)  # V^* P
 
     return w, P, B, V
+
 
 class S4(keras.Model):
 
